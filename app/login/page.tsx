@@ -23,7 +23,7 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     if (!auth) {
-      setError("Add Firebase web settings to .env.local first.");
+      setError("Firebase web settings are missing from this build. Add the NEXT_PUBLIC_FIREBASE_* variables to your deployment environment and rebuild, or configure .env.local for local development.");
       return;
     }
     setBusy(true);
@@ -174,8 +174,7 @@ export default function LoginPage() {
           </p>
           {!firebaseConfigured && (
             <p className="mt-5 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
-              Firebase is not configured yet. Copy .env.example to .env.local and add the Firebase
-              web app keys.
+              Firebase web settings are missing from this build. Set the NEXT_PUBLIC_FIREBASE_* variables in Render and redeploy, or add them to .env.local for local development.
             </p>
           )}
         </div>
