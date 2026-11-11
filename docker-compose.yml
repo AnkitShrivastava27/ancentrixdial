@@ -1,0 +1,8 @@
+services:
+  human-dialer:
+    build: .
+    ports:
+      - "3000:10000"
+    env_file:
+      - .env
+    restart: unless-stopped

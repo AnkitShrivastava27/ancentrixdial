@@ -1,0 +1,7 @@
+{
+  "indexes": [
+    { "collectionGroup": "contacts", "queryScope": "COLLECTION", "fields": [{"fieldPath":"organizationId","order":"ASCENDING"},{"fieldPath":"ownerId","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}] },
+    { "collectionGroup": "call_logs", "queryScope": "COLLECTION", "fields": [{"fieldPath":"organizationId","order":"ASCENDING"},{"fieldPath":"userId","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}] }
+  ],
+  "fieldOverrides": []
+}
