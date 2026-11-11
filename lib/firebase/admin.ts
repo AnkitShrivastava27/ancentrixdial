@@ -8,7 +8,7 @@ const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
 const privateKey = process.env.FIREBASE_PRIVATE_KEY
   ?.trim()
   // Accept either a raw PEM or a quoted .env value copied from the service account JSON.
-  .replace(/^(["'])(.*)\1$/s, "$2")
+  .replace(/^(["'])([\s\S]*)\1$/, "$2")
   .replace(/\\n/g, "\n")
   .replace(/\r\n/g, "\n");
 
