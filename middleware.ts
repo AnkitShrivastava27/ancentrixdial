@@ -24,4 +24,4 @@ export function middleware(request: NextRequest) {
   if (!cookie?.value) return NextResponse.redirect(new URL("/login", request.url));
   return NextResponse.next();
 }
-export const config = { matcher: ["/((?!.*\\.).*)"] };
+export const config = { matcher: ["/((?!.*\\.).*)"], runtime: "nodejs" };
