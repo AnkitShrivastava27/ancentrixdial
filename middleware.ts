@@ -28,7 +28,7 @@ export function middleware(request: NextRequest) {
   if (path.startsWith("/api/") && path !== "/api/telnyx/webhook") {
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
     const windowMs = 60_000;
-    const limit = path === "/api/auth/session" ? 15 : 120;
+    const limit = path === "/api/auth/session" ? (request.method === "POST" ? 15 : 60) : 120;
     const key = `${ip}:${path}`;
     const now = Date.now();
     const record = requestCounts.get(key);

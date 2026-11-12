@@ -11,6 +11,35 @@ import {
 import { auth, firebaseConfigured } from "@/lib/firebase/client";
 import { PhoneCall } from "lucide-react";
 
+function withTimeout<T>(promise: Promise<T>, message: string, timeoutMs = 20_000): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error(message)), timeoutMs);
+    promise.then(
+      (value) => {
+        clearTimeout(timeout);
+        resolve(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timeout);
+        reject(error);
+      },
+    );
+  });
+}
+
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, message: string): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20_000);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error(message);
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -21,7 +50,7 @@ export default function LoginPage() {
   const [workspace, setWorkspace] = useState({ companyName: "", ownerName: "" });
   useEffect(() => {
     let active = true;
-    void fetch("/api/auth/session", { cache: "no-store", credentials: "same-origin" })
+    void fetchWithTimeout("/api/auth/session", { cache: "no-store", credentials: "same-origin" }, "Session check timed out")
       .then((response) => {
         if (active && response.ok) window.location.replace("/");
       })
@@ -32,7 +61,11 @@ export default function LoginPage() {
   }, []);
 
   const navigateToDashboard = async () => {
-    const check = await fetch("/api/auth/session", { method: "GET", cache: "no-store", credentials: "same-origin" });
+    const check = await fetchWithTimeout(
+      "/api/auth/session",
+      { method: "GET", cache: "no-store", credentials: "same-origin" },
+      "Session check timed out. Please try again.",
+    );
     const data = await check.json().catch(() => ({}));
     if (!check.ok) {
       throw new Error(data.error || "Sign-in succeeded, but the browser did not retain the session cookie. Check the site URL and cookie settings, then try again.");
@@ -48,14 +81,23 @@ export default function LoginPage() {
     }
     setBusy(true);
     try {
-      await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
-      const credential = await signInWithEmailAndPassword(auth, email, password);
-      const idToken = await credential.user.getIdToken(true);
-      const response = await fetch("/api/auth/session", {
+      await withTimeout(
+        setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence),
+        "Firebase sign-in setup timed out. Check your connection and try again.",
+      );
+      const credential = await withTimeout(
+        signInWithEmailAndPassword(auth, email, password),
+        "Firebase sign-in timed out. Check your connection and try again.",
+      );
+      const idToken = await withTimeout(
+        credential.user.getIdToken(true),
+        "Could not get a Firebase sign-in token in time. Please try again.",
+      );
+      const response = await fetchWithTimeout("/api/auth/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ idToken, remember }),
-      });
+      }, "The server took too long to create your sign-in session. Please try again.");
       const contentType = response.headers.get("content-type") || "";
       if (!contentType.includes("application/json")) {
         throw new Error(
@@ -88,19 +130,19 @@ export default function LoginPage() {
     setError("");
     setBusy(true);
     try {
-      const setupResponse = await fetch("/api/organization/register", {
+      const setupResponse = await fetchWithTimeout("/api/organization/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...workspace, idToken: setupToken }),
-      });
+      }, "Workspace setup timed out. Please try again.");
       const setupData = await setupResponse.json();
       if (!setupResponse.ok) throw new Error(setupData.error || "Could not create workspace");
       localStorage.removeItem("pendingOrganization");
-      const sessionResponse = await fetch("/api/auth/session", {
+      const sessionResponse = await fetchWithTimeout("/api/auth/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ idToken: setupToken, remember }),
-      });
+      }, "The server took too long to create your sign-in session. Please try again.");
       const sessionData = await sessionResponse.json();
       if (!sessionResponse.ok) throw new Error(sessionData.error || "Workspace created, but sign-in did not finish");
       await navigateToDashboard();
