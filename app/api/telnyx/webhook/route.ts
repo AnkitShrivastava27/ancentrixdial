@@ -47,9 +47,20 @@ function timestampMillis(value: any): number | null {
 export async function POST(request: NextRequest) {
   if (!db) return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
   const rawBody = await request.text();
-  if (!verifyTelnyxWebhook(rawBody, request.headers.get("telnyx-timestamp"), request.headers.get("telnyx-signature-ed25519"))) {
-    console.error("Rejected Telnyx webhook: missing/invalid signature or TELNYX_PUBLIC_KEY configuration.");
-    return NextResponse.json({ error: "Invalid Telnyx webhook signature. Check TELNYX_PUBLIC_KEY on the server." }, { status: 401 });
+  const verification = verifyTelnyxWebhook(
+    rawBody,
+    request.headers.get("telnyx-timestamp"),
+    request.headers.get("telnyx-signature-ed25519"),
+  );
+  if (!verification.ok) {
+    // Keep this diagnostic actionable without ever logging the key, signature,
+    // or webhook payload. It distinguishes a missing Render variable from a
+    // wrong/rotated key and malformed or expired webhook headers.
+    console.error(`Rejected Telnyx webhook: ${verification.reason}.`);
+    return NextResponse.json(
+      { error: "Telnyx webhook signature verification failed." },
+      { status: 401 },
+    );
   }
 
   let event: TelnyxEvent;

@@ -23,5 +23,7 @@ services:
         sync: false
       - key: ENCRYPTION_KEY
         sync: false
+      - key: TELNYX_PUBLIC_KEY
+        sync: false
       - key: SESSION_COOKIE_NAME
         value: human-dialer-session
