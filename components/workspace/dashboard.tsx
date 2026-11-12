@@ -13,6 +13,7 @@ type CallLog = {
   direction?: string;
   status?: string;
   duration?: number;
+  connectedAt?: Date | string | number | { seconds?: number; _seconds?: number; toDate?: () => Date } | null;
   userName?: string;
   createdAt?: Date | string | number | { seconds?: number; _seconds?: number; toDate?: () => Date } | null;
 };
@@ -98,7 +99,7 @@ function buildCallActivity(calls: CallLog[], range: ActivityRange): ActivityPoin
     if (!point) continue;
 
     point.calls += 1;
-    if (call.status === "connected") point.connected += 1;
+    if (call.connectedAt || call.status === "connected") point.connected += 1;
   }
 
   return points;
@@ -116,7 +117,7 @@ export function Dashboard({ user, onNavigate }: { user: SessionUser; onNavigate:
     const createdAt = getCallDate(call.createdAt);
     return createdAt?.toDateString() === today.toDateString();
   });
-  const connected = allCalls.filter((call) => call.status === "connected").length;
+  const connected = allCalls.filter((call) => Boolean(call.connectedAt) || call.status === "connected").length;
   const missed = allCalls.filter((call) => call.status === "missed").length;
   const activity = useMemo(() => buildCallActivity(allCalls, activityRange), [allCalls, activityRange]);
   const hasActivity = activity.some((point) => point.calls > 0);
@@ -243,7 +244,7 @@ export function Dashboard({ user, onNavigate }: { user: SessionUser; onNavigate:
           </div>
           {allCalls.length ? allCalls.slice(0, 5).map((call) => (
             <div key={call.id} className="flex items-center gap-3 border-b border-slate-50 px-5 py-3 last:border-0 dark:border-slate-800">
-              <div className={`grid h-9 w-9 place-items-center rounded-full ${call.status === "connected" ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"}`}><Phone size={15} /></div>
+              <div className={`grid h-9 w-9 place-items-center rounded-full ${call.connectedAt || call.status === "connected" || (call.status === "ended" && (call.duration || 0) > 0) ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"}`}><Phone size={15} /></div>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium">{call.contactName || call.number || "Unknown caller"}</div>
                 <div className="text-xs text-slate-400">{call.direction || "Call"} · {call.userName || "Team"}</div>

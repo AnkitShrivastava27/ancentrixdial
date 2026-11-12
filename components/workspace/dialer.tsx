@@ -7,11 +7,31 @@ import type { SessionUser } from "@/lib/auth";
 type ActiveCall = {
   id: string;
   status: string;
+  number?: string | null;
+  contactName?: string | null;
   connectedAt: number | null;
   customerDialedAt: number | null;
   customerAnsweredAt?: number | null;
-  bridgeRequestedAt?: number | null;
-  bridgeErrorMessage?: string | null;
+  customerDialStatus?: string | null;
+  customerDialError?: string | null;
+  customerDialHttpStatus?: number | null;
+  customerDialTarget?: string | null;
+  customerDialAttemptedAt?: number | null;
+  customerDialCallerId?: string | null;
+  agentDialStatus?: string | null;
+  agentAnsweredAt?: number | null;
+  agentCallControlId?: string | null;
+  customerCallControlId?: string | null;
+  bridgeMode?: string | null;
+  hangupError?: string | null;
+  lastWebhookLeg?: string | null;
+  lastWebhookCallControlId?: string | null;
+  lastWebhookFrom?: string | null;
+  lastWebhookTo?: string | null;
+  lastTelnyxEventAt?: number | null;
+  webhookError?: string | null;
+  webhookErrorEventType?: string | null;
+  webhookErrorLeg?: string | null;
   callSessionId?: string | null;
   agentCallSessionId?: string | null;
   customerCallSessionId?: string | null;
@@ -57,19 +77,29 @@ export function Dialer({ visible = true, user, initialTarget }: { visible?: bool
           if (next.endedAt || ["missed", "failed", "rejected"].includes(next.status)) {
             setCall(null);
             setSeconds(next.duration || 0);
-            setStatus(next.status === "connected" ? "Call ended" : next.status === "missed" ? (next.endedByLeg === "agent" ? "Your phone was not answered" : "The contact did not answer") : next.status === "rejected" ? "Call ended" : next.errorMessage || "Call failed");
+            setStatus(next.status === "connected" || next.status === "ended" ? "Call ended" : next.status === "missed" ? (next.endedByLeg === "agent" ? "Your phone was not answered" : "The contact did not answer") : next.status === "rejected" ? "Call ended" : next.customerDialError || next.errorMessage || "Call failed");
           } else {
             setCall(next);
             setStatus(
-              next.connectedAt
-                ? "Call bridged — audio should be live on both phones"
-                : next.bridgeErrorMessage
-                  ? `Audio bridge failed: ${next.bridgeErrorMessage}`
-                  : next.bridgeRequestedAt || next.customerAnsweredAt
-                    ? "Contact answered — connecting audio…"
-                    : next.customerDialedAt
-                      ? "Your phone answered — calling the contact…"
-                      : "Calling your phone… answer it to call the contact.",
+              next.hangupError
+                ? `Hangup error: ${next.hangupError}`
+                : next.status === "ending"
+                  ? "Telnyx is ending both phone legs…"
+                  : next.customerDialError
+                    ? `Customer call failed: ${next.customerDialError}`
+                    : next.connectedAt
+                  ? "Telnyx confirms both legs bridged — verify audio on the two phones"
+                  : next.customerDialStatus === "initiating"
+                    ? "Your phone answered — starting the customer call…"
+                    : next.customerDialStatus === "ringing"
+                      ? "Your phone answered — customer phone is ringing…"
+                      : next.customerDialStatus === "answered"
+                        ? "Customer answered — waiting for Telnyx to bridge both legs…"
+                        : next.customerDialStatus === "failed"
+                          ? `Customer call failed: ${next.customerDialError || next.errorMessage || "Telnyx rejected the second call."}`
+                          : next.agentAnsweredAt
+                            ? "Your phone answered — waiting for the customer-call request…"
+                            : "Calling your profile phone… answer it to call the customer.",
             );
             if (next.connectedAt) setSeconds(Math.max(0, Math.floor((Date.now() - next.connectedAt) / 1000)));
           }
@@ -103,9 +133,19 @@ export function Dialer({ visible = true, user, initialTarget }: { visible?: bool
   const hangup = async () => {
     const active = callRef.current;
     if (!active) return;
-    setStatus("Ending call…");
-    await fetch(`/api/telnyx/calls/${active.id}`, { method: "DELETE" }).catch(() => {});
-    setCall(null); setStatus("Call ended");
+    setStatus("Ending both call legs…");
+    try {
+      const response = await fetch(`/api/telnyx/calls/${active.id}`, { method: "DELETE" });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setStatus(result.error || "Telnyx did not confirm that both phones disconnected. Retry End call.");
+        return;
+      }
+      setCall(null);
+      setStatus("Call ended on both phones");
+    } catch {
+      setStatus("Could not reach the server to end the call. Check your connection and retry.");
+    }
   };
   const format = (value: number) => `${Math.floor(value / 60).toString().padStart(2, "0")}:${(value % 60).toString().padStart(2, "0")}`;
 
@@ -115,12 +155,31 @@ export function Dialer({ visible = true, user, initialTarget }: { visible?: bool
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-soft dark:border-slate-800 dark:bg-slate-900">
         <div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl bg-indigo-50 text-brand"><PhoneForwarded size={18}/></div><div><div className="text-sm font-semibold">Phone bridge</div><div className="text-xs text-slate-500">Your phone: {user.phone || "Add a phone number in Settings → Profile"}</div></div></div>
         <div className="mx-auto mt-8 max-w-sm text-center"><div className="mb-3 min-h-5 text-xs font-medium text-slate-500">{status}</div>{call?.connectedAt && <div className="mb-3 font-mono text-xl tabular-nums">{format(seconds)}</div>}
-          <div className="flex items-center rounded-xl border border-slate-200 px-4 dark:border-slate-700"><input value={number} onChange={(event) => { setNumber(event.target.value); setContactName(""); }} onKeyDown={(event) => event.key === "Enter" && void place()} placeholder="Enter a phone number" type="tel" className="h-14 w-full bg-transparent text-center text-xl outline-none placeholder:text-slate-300"/><button onClick={() => { setNumber(number.slice(0, -1)); setContactName(""); }} title="Delete digit" className="text-slate-400"><Delete size={18}/></button></div>
-          <div className="mx-auto mt-4 grid max-w-[300px] grid-cols-3 gap-3">{["1","2","3","4","5","6","7","8","9","*","0","#"].map((digit) => <button key={digit} onClick={() => { setNumber((value) => value + digit); setContactName(""); }} className="h-14 rounded-xl bg-slate-50 text-xl font-medium hover:bg-indigo-50 hover:text-brand dark:bg-slate-800 dark:hover:bg-slate-700">{digit}</button>)}</div>
+          <div className="flex items-center rounded-xl border border-slate-200 px-4 dark:border-slate-700"><input value={number} disabled={!!call} onChange={(event) => { setNumber(event.target.value); setContactName(""); }} onKeyDown={(event) => event.key === "Enter" && void place()} placeholder="Enter a number with country code, e.g. +919876543210" type="tel" className="h-14 w-full bg-transparent text-center text-xl outline-none placeholder:text-slate-300 disabled:opacity-60"/><button disabled={!!call} onClick={() => { setNumber(number.slice(0, -1)); setContactName(""); }} title="Delete digit" className="text-slate-400 disabled:opacity-40"><Delete size={18}/></button></div>
+          <div className="mx-auto mt-4 grid max-w-[300px] grid-cols-3 gap-3">{["1","2","3","4","5","6","7","8","9","*","0","#"].map((digit) => <button key={digit} disabled={!!call} onClick={() => { setNumber((value) => value + digit); setContactName(""); }} className="h-14 rounded-xl bg-slate-50 text-xl font-medium hover:bg-indigo-50 hover:text-brand disabled:opacity-40 dark:bg-slate-800 dark:hover:bg-slate-700">{digit}</button>)}</div>
           <div className="mt-5 flex justify-center">{call ? <button onClick={() => void hangup()} className="flex h-12 items-center gap-2 rounded-xl bg-red-500 px-6 font-semibold text-white"><PhoneOff size={18}/> End call</button> : <button disabled={busy || !user.phone} onClick={() => void place()} className="flex h-12 items-center gap-2 rounded-xl bg-emerald-500 px-8 font-semibold text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"><Phone size={18}/> {busy ? "Starting…" : "Call"}</button>}</div>
         </div>
       </section>
-      <section className="rounded-2xl bg-[#f1f0ff] p-5 dark:bg-indigo-950/50"><div className="font-semibold">How calls work</div><ol className="mt-2 list-inside list-decimal space-y-2 text-sm leading-6 text-slate-600 dark:text-slate-300"><li>Enter the customer’s phone number.</li><li>Telnyx first calls your saved profile phone number.</li><li>After you answer, Telnyx calls the customer.</li><li>When the customer answers, Telnyx automatically bridges both call legs. The timer starts after Telnyx confirms the bridge.</li></ol><p className="mt-4 text-xs text-slate-500">Inbound calls to your Telnyx number ring the workspace owner’s phone.</p>{call?.callSessionId && <div className="mt-4 rounded-xl border border-indigo-200 bg-white/70 p-3 text-xs dark:border-indigo-900 dark:bg-slate-900/60"><div className="font-semibold">Telnyx diagnostic session</div><div className="mt-1 break-all font-mono text-[11px] text-slate-600 dark:text-slate-300">{call.callSessionId}</div><div className="mt-1 text-slate-500">Last event: {call.lastTelnyxEvent || "Waiting"}{call.sipHangupCause ? ` · SIP cause ${call.sipHangupCause}` : ""}</div><button type="button" onClick={() => void navigator.clipboard?.writeText(call.callSessionId || "")} className="mt-2 font-semibold text-brand hover:underline">Copy session ID</button></div>}</section>
+      <section className="rounded-2xl bg-[#f1f0ff] p-5 dark:bg-indigo-950/50"><div className="font-semibold">How calls work</div><ol className="mt-2 list-inside list-decimal space-y-2 text-sm leading-6 text-slate-600 dark:text-slate-300"><li>Enter the customer’s phone number.</li><li>Telnyx first calls your saved profile phone number.</li><li>After you answer, Telnyx calls the customer.</li><li>When the customer answers, Telnyx automatically bridges both call legs. The timer starts after Telnyx confirms the bridge.</li></ol><p className="mt-4 text-xs text-slate-500">Inbound calls to your Telnyx number ring the workspace owner’s phone.</p>{call && <div className="mt-4 rounded-xl border border-indigo-200 bg-white/70 p-3 text-xs dark:border-indigo-900 dark:bg-slate-900/60">
+        <div className="font-semibold">Call diagnostics</div>
+        <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-slate-600 dark:text-slate-300">
+          <span>Customer destination</span><span className="break-all text-right font-mono">{call.customerDialTarget || call.number || number || "—"}</span>
+          <span>Profile phone state</span><span className="text-right font-semibold">{call.agentDialStatus || "initiating"}</span>
+          <span>Customer dial state</span><span className="text-right font-semibold">{call.customerDialStatus || "Waiting for profile phone"}{call.customerDialHttpStatus ? ` (HTTP ${call.customerDialHttpStatus})` : ""}</span>
+          <span>Customer dial requested</span><span className="text-right">{call.customerDialAttemptedAt ? new Date(call.customerDialAttemptedAt).toLocaleTimeString() : "Not yet"}</span>
+          <span>Agent webhook</span><span className="text-right">{call.lastTelnyxEvent || "Not received"}{call.lastWebhookLeg ? ` (${call.lastWebhookLeg})` : ""}</span>
+          <span>Webhook destination</span><span className="break-all text-right font-mono">{call.lastWebhookTo || "—"}</span>
+          <span>Agent bridged</span><span className="text-right">{call.agentBridgedAt ? "Yes" : "Not confirmed"}</span>
+          <span>Customer bridged</span><span className="text-right">{call.customerBridgedAt ? "Yes" : "Not confirmed"}</span>
+          <span>Agent call-control ID</span><span className="break-all text-right font-mono">{call.agentCallControlId || "Waiting"}</span>
+          <span>Customer call-control ID</span><span className="break-all text-right font-mono">{call.customerCallControlId || "Not created"}</span>
+          <span>Session ID</span><span className="break-all text-right font-mono">{call.callSessionId || "Waiting"}</span>
+        </div>
+        {call.customerDialError && <p className="mt-2 break-words text-red-600">Customer dial error: {call.customerDialError}</p>}
+        {call.webhookError && <p className="mt-2 break-words text-red-600">Webhook error ({call.webhookErrorEventType || "event"}/{call.webhookErrorLeg || "unknown leg"}): {call.webhookError}</p>}
+        {call.hangupError && <p className="mt-2 break-words text-red-600">Hangup error: {call.hangupError}</p>}
+        {call.callSessionId && <button type="button" onClick={() => void navigator.clipboard?.writeText(call.callSessionId || "")} className="mt-2 font-semibold text-brand hover:underline">Copy session ID</button>}
+      </div>}</section>
     </div>
   </div>;
 }
