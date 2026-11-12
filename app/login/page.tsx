@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   browserLocalPersistence,
   browserSessionPersistence,
@@ -19,13 +19,25 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [setupToken, setSetupToken] = useState("");
   const [workspace, setWorkspace] = useState({ companyName: "", ownerName: "" });
+  useEffect(() => {
+    let active = true;
+    void fetch("/api/auth/session", { cache: "no-store", credentials: "same-origin" })
+      .then((response) => {
+        if (active && response.ok) window.location.replace("/");
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const navigateToDashboard = async () => {
     const check = await fetch("/api/auth/session", { method: "GET", cache: "no-store", credentials: "same-origin" });
     const data = await check.json().catch(() => ({}));
     if (!check.ok) {
       throw new Error(data.error || "Sign-in succeeded, but the browser did not retain the session cookie. Check the site URL and cookie settings, then try again.");
     }
-    window.location.assign("/");
+    window.location.replace("/");
   };
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
