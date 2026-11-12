@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     const response = await fetch("https://api.telnyx.com/v2/calls", {
       method: "POST",
       headers: { Authorization: `Bearer ${decryptTelnyxApiKey(config.apiKey)}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ connection_id: config.voiceAppId, to: user.phone, from: config.outboundNumber, webhook_url: webhookUrl.toString(), webhook_url_method: "POST", timeout_secs: 30 }),
+      body: JSON.stringify({ connection_id: config.voiceAppId, to: user.phone, from: config.outboundNumber, webhook_url: webhookUrl.toString(), webhook_url_method: "POST", timeout_secs: 30 }), // First leg rings the employee; the webhook then dials and bridges parsed.data.number.
       cache: "no-store",
     });
     const result = await response.json().catch(() => ({}));

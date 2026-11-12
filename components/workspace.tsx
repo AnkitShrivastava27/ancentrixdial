@@ -10,6 +10,7 @@ import { Dialer } from "@/components/workspace/dialer";
 import { SettingsView } from "@/components/workspace/settings";
 
 type View = "Dashboard" | "Contacts" | "Call logs" | "Dialer" | "Settings";
+type DialTarget = { number: string; contactName: string };
 const nav = [
   { title: "WORKSPACE", items: [{ label: "Dashboard", icon: BarChart3 }, { label: "Contacts", icon: ContactRound }, { label: "Call logs", icon: Activity }] },
   { title: "TOOLS", items: [{ label: "Dialer", icon: Phone }] },
@@ -18,8 +19,10 @@ const nav = [
 
 export function Workspace({ user }: { user: SessionUser }) {
   const [view, setView] = useState<View>("Dashboard"); const [open, setOpen] = useState(false); const [dark, setDark] = useState(false);
+  const [dialTarget, setDialTarget] = useState<DialTarget | null>(null);
+  const startContactCall = (target: DialTarget) => { setDialTarget(target); setView("Dialer"); setOpen(false); };
   const logout = async () => { await fetch("/api/auth/session", { method: "DELETE" }); location.href = "/login"; };
-  const component = view === "Contacts" ? <Contacts user={user} /> : view === "Call logs" ? <CallLogs /> : view === "Dialer" ? null : view === "Settings" ? <SettingsView user={user} /> : <Dashboard user={user} onNavigate={setView} />;
+  const component = view === "Contacts" ? <Contacts user={user} onCall={startContactCall} /> : view === "Call logs" ? <CallLogs /> : view === "Dialer" ? null : view === "Settings" ? <SettingsView user={user} /> : <Dashboard user={user} onNavigate={setView} />;
   return <div className={dark ? "dark" : ""}>
     <div className="min-h-screen bg-[#f7f8fc] text-ink dark:bg-[#111827] dark:text-slate-100">
       {open && <button aria-label="Close menu" onClick={() => setOpen(false)} className="fixed inset-0 z-30 bg-slate-900/30 lg:hidden" />}
@@ -32,6 +35,6 @@ export function Workspace({ user }: { user: SessionUser }) {
         </div>
         <div className="shrink-0 border-t border-slate-100 bg-white p-4 dark:border-slate-800 dark:bg-slate-950"><div className="flex items-center gap-3"><div className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 text-sm font-bold text-white">{user.name.slice(0,1).toUpperCase()}</div><div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{user.name}</div><div className="truncate text-xs text-slate-400">{user.email}</div></div><button onClick={logout} title="Sign out" className="text-slate-400 hover:text-slate-700"><LogOut size={16}/></button></div></div>
       </aside>
-      <div className="lg:pl-[252px]"><header className="sticky top-0 z-20 flex h-[76px] items-center justify-between border-b border-slate-200 bg-white/90 px-5 backdrop-blur sm:px-8 dark:border-slate-800 dark:bg-slate-950/90"><div className="flex items-center gap-3"><button className="lg:hidden" onClick={() => setOpen(true)}><Menu size={21}/></button><div><div className="text-sm text-slate-400">Workspace <span className="px-1">/</span> <span className="text-slate-700 dark:text-slate-200">{view}</span></div><div className="hidden text-[11px] text-slate-400 sm:block">A clear view of your customer conversations</div></div></div><div className="flex items-center gap-2"><button onClick={() => setView("Dialer")} className="hidden items-center gap-2 rounded-lg bg-brand px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-dark sm:flex"><Plus size={16}/> New call</button><button title="Toggle theme" onClick={() => setDark(!dark)} className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">{dark ? <Sun size={17}/> : <Moon size={17}/>}</button><button title="Help" className="grid h-9 w-9 place-items-center rounded-lg text-slate-400 hover:bg-slate-50"><CircleHelp size={18}/></button></div></header><main className="mx-auto max-w-[1440px] p-5 sm:p-8"><Dialer visible={view === "Dialer"} user={user}/>{component}</main></div>
+      <div className="lg:pl-[252px]"><header className="sticky top-0 z-20 flex h-[76px] items-center justify-between border-b border-slate-200 bg-white/90 px-5 backdrop-blur sm:px-8 dark:border-slate-800 dark:bg-slate-950/90"><div className="flex items-center gap-3"><button className="lg:hidden" onClick={() => setOpen(true)}><Menu size={21}/></button><div><div className="text-sm text-slate-400">Workspace <span className="px-1">/</span> <span className="text-slate-700 dark:text-slate-200">{view}</span></div><div className="hidden text-[11px] text-slate-400 sm:block">A clear view of your customer conversations</div></div></div><div className="flex items-center gap-2"><button onClick={() => setView("Dialer")} className="hidden items-center gap-2 rounded-lg bg-brand px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-dark sm:flex"><Plus size={16}/> New call</button><button title="Toggle theme" onClick={() => setDark(!dark)} className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">{dark ? <Sun size={17}/> : <Moon size={17}/>}</button><button title="Help" className="grid h-9 w-9 place-items-center rounded-lg text-slate-400 hover:bg-slate-50"><CircleHelp size={18}/></button></div></header><main className="mx-auto max-w-[1440px] p-5 sm:p-8"><Dialer visible={view === "Dialer"} user={user} initialTarget={dialTarget}/>{component}</main></div>
     </div></div>;
 }

@@ -89,7 +89,7 @@ export function SettingsView({ user }: { user: SessionUser }) {
       let data: { ok?: boolean; error?: string } = {};
       try { data = responseText ? JSON.parse(responseText) as { ok?: boolean; error?: string } : {}; } catch { /* handled below */ }
       if (r.ok && data.ok) {
-        setNotice("Telnyx settings saved. Calls will ring the employee phone before connecting the customer.");
+        setNotice("Telnyx settings saved. Calls will ring the employee phone, then dial and bridge the selected contact.");
       } else {
         setNotice(data.error || `The server returned an empty or invalid response while saving Telnyx settings (HTTP ${r.status}). Check the server logs.`);
       }
@@ -366,7 +366,7 @@ export function SettingsView({ user }: { user: SessionUser }) {
                 <p className="text-xs leading-5 text-slate-500 sm:col-span-2">
                   Set the Voice API Application webhook URL to your Render URL ending in
                   <code className="mx-1 rounded bg-slate-100 px-1 py-0.5 dark:bg-slate-800">/api/telnyx/webhook</code>
-                  using webhook API v2. Each employee must save their mobile or desk phone in Profile before calling.
+                  using webhook API v2. Also set the matching TELNYX_PUBLIC_KEY environment variable on the server; it is required to verify Telnyx callbacks. Each employee must save their mobile or desk phone in Profile before calling.
                   For local testing, set <code className="mx-1 rounded bg-slate-100 px-1 py-0.5 dark:bg-slate-800">NEXT_PUBLIC_APP_URL</code> to a public HTTPS tunnel; Telnyx cannot send callbacks to localhost.
                 </p>
                 <div className="sm:col-span-2">

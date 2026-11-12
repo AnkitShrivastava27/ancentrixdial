@@ -10,8 +10,10 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   const snap = await db.collection("call_logs").doc(id).get();
   const call = snap.data();
   if (!call || call.organizationId !== user.organizationId || (user.role !== "owner" && call.userId !== user.uid)) return NextResponse.json({ error: "Call not found" }, { status: 404 });
-  const connectedAt = call.connectedAt?.toDate ? call.connectedAt.toDate().getTime() : call.connectedAt ? new Date(call.connectedAt).getTime() : null;
-  return NextResponse.json({ id, status: call.status, connectedAt, endedAt: !!call.endedAt, duration: call.duration || 0 });
+  const toMillis = (value: any) => value?.toDate ? value.toDate().getTime() : value ? new Date(value).getTime() : null;
+  const connectedAt = toMillis(call.connectedAt);
+  const customerDialedAt = toMillis(call.customerDialedAt);
+  return NextResponse.json({ id, status: call.status, connectedAt, customerDialedAt, endedAt: !!call.endedAt, endedByLeg: call.endedByLeg || null, errorMessage: call.errorMessage || null, duration: call.duration || 0 });
 }
 
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -21,12 +23,14 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
   const ref = db.collection("call_logs").doc(id);
   const snap = await ref.get(); const call = snap.data();
   if (!call || call.organizationId !== user.organizationId || (user.role !== "owner" && call.userId !== user.uid)) return NextResponse.json({ error: "Call not found" }, { status: 404 });
-  if (call.callControlId && !call.endedAt && call.status !== "missed" && call.status !== "failed" && call.status !== "rejected") {
+  if (!call.endedAt && call.status !== "missed" && call.status !== "failed" && call.status !== "rejected") {
     const config = (await db.collection("telnyx_config").doc(user.organizationId).get()).data();
     if (config?.apiKey) {
-      await fetch(`https://api.telnyx.com/v2/calls/${encodeURIComponent(call.callControlId)}/actions/hangup`, {
-        method: "POST", headers: { Authorization: `Bearer ${decryptTelnyxApiKey(config.apiKey)}`, "Content-Type": "application/json" }, body: JSON.stringify({}), cache: "no-store",
-      }).catch(() => {});
+      const apiKey = decryptTelnyxApiKey(config.apiKey);
+      const callControlIds = [call.callControlId, call.customerCallControlId].filter((value): value is string => typeof value === "string" && value.length > 0);
+      await Promise.all(callControlIds.map((callControlId) => fetch(`https://api.telnyx.com/v2/calls/${encodeURIComponent(callControlId)}/actions/hangup`, {
+        method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({}), cache: "no-store",
+      }).catch(() => undefined)));
     }
   }
   await ref.update({ status: call.connectedAt ? "connected" : "rejected", endedAt: new Date(), ...(call.connectedAt ? { duration: Math.max(0, Math.floor((Date.now() - call.connectedAt.toDate().getTime()) / 1000)) } : {}) });
