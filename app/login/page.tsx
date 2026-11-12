@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   browserLocalPersistence,
   browserSessionPersistence,
@@ -48,18 +48,6 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [setupToken, setSetupToken] = useState("");
   const [workspace, setWorkspace] = useState({ companyName: "", ownerName: "" });
-  useEffect(() => {
-    let active = true;
-    void fetchWithTimeout("/api/auth/session", { cache: "no-store", credentials: "same-origin" }, "Session check timed out")
-      .then((response) => {
-        if (active && response.ok) window.location.replace("/");
-      })
-      .catch(() => undefined);
-    return () => {
-      active = false;
-    };
-  }, []);
-
   const navigateToDashboard = async () => {
     const check = await fetchWithTimeout(
       "/api/auth/session",
