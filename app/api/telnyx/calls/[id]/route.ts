@@ -14,7 +14,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   const connectedAt = toMillis(call.connectedAt);
   const customerDialedAt = toMillis(call.customerDialedAt);
   const customerAnsweredAt = toMillis(call.customerAnsweredAt);
-  const bridgeRequestedAt = toMillis(call.bridgeCommandPendingAt || call.bridgeCommandAcceptedAt);
+  const bridgeRequestedAt = toMillis(call.customerAnsweredAt);
   return NextResponse.json({
     id,
     status: call.status,
@@ -23,6 +23,14 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     customerAnsweredAt,
     bridgeRequestedAt,
     bridgeErrorMessage: call.bridgeErrorMessage || null,
+    callSessionId: call.telnyxCallSessionId || call.agentCallSessionId || call.customerCallSessionId || null,
+    agentCallSessionId: call.agentCallSessionId || null,
+    customerCallSessionId: call.customerCallSessionId || null,
+    agentBridgedAt: toMillis(call.agentBridgedAt),
+    customerBridgedAt: toMillis(call.customerBridgedAt),
+    lastTelnyxEvent: call.lastTelnyxEvent || null,
+    sipHangupCause: call.sipHangupCause || null,
+    hangupCause: call.hangupCause || null,
     endedAt: !!call.endedAt,
     endedByLeg: call.endedByLeg || null,
     errorMessage: call.errorMessage || null,

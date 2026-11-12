@@ -12,6 +12,14 @@ type ActiveCall = {
   customerAnsweredAt?: number | null;
   bridgeRequestedAt?: number | null;
   bridgeErrorMessage?: string | null;
+  callSessionId?: string | null;
+  agentCallSessionId?: string | null;
+  customerCallSessionId?: string | null;
+  agentBridgedAt?: number | null;
+  customerBridgedAt?: number | null;
+  lastTelnyxEvent?: string | null;
+  sipHangupCause?: string | null;
+  hangupCause?: string | null;
   endedAt: boolean;
   endedByLeg?: string | null;
   errorMessage?: string | null;
@@ -54,7 +62,7 @@ export function Dialer({ visible = true, user, initialTarget }: { visible?: bool
             setCall(next);
             setStatus(
               next.connectedAt
-                ? "Connected — speak on your phone"
+                ? "Call bridged — audio should be live on both phones"
                 : next.bridgeErrorMessage
                   ? `Audio bridge failed: ${next.bridgeErrorMessage}`
                   : next.bridgeRequestedAt || next.customerAnsweredAt
@@ -112,7 +120,7 @@ export function Dialer({ visible = true, user, initialTarget }: { visible?: bool
           <div className="mt-5 flex justify-center">{call ? <button onClick={() => void hangup()} className="flex h-12 items-center gap-2 rounded-xl bg-red-500 px-6 font-semibold text-white"><PhoneOff size={18}/> End call</button> : <button disabled={busy || !user.phone} onClick={() => void place()} className="flex h-12 items-center gap-2 rounded-xl bg-emerald-500 px-8 font-semibold text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"><Phone size={18}/> {busy ? "Starting…" : "Call"}</button>}</div>
         </div>
       </section>
-      <section className="rounded-2xl bg-[#f1f0ff] p-5 dark:bg-indigo-950/50"><div className="font-semibold">How calls work</div><ol className="mt-2 list-inside list-decimal space-y-2 text-sm leading-6 text-slate-600 dark:text-slate-300"><li>Enter the customer’s phone number.</li><li>Telnyx first calls your saved profile phone number.</li><li>After you answer, Telnyx calls the customer.</li><li>When the customer answers, the server explicitly bridges both call legs. The timer starts only after Telnyx confirms the bridge.</li></ol><p className="mt-4 text-xs text-slate-500">Inbound calls to your Telnyx number ring the workspace owner’s phone.</p></section>
+      <section className="rounded-2xl bg-[#f1f0ff] p-5 dark:bg-indigo-950/50"><div className="font-semibold">How calls work</div><ol className="mt-2 list-inside list-decimal space-y-2 text-sm leading-6 text-slate-600 dark:text-slate-300"><li>Enter the customer’s phone number.</li><li>Telnyx first calls your saved profile phone number.</li><li>After you answer, Telnyx calls the customer.</li><li>When the customer answers, Telnyx automatically bridges both call legs. The timer starts after Telnyx confirms the bridge.</li></ol><p className="mt-4 text-xs text-slate-500">Inbound calls to your Telnyx number ring the workspace owner’s phone.</p>{call?.callSessionId && <div className="mt-4 rounded-xl border border-indigo-200 bg-white/70 p-3 text-xs dark:border-indigo-900 dark:bg-slate-900/60"><div className="font-semibold">Telnyx diagnostic session</div><div className="mt-1 break-all font-mono text-[11px] text-slate-600 dark:text-slate-300">{call.callSessionId}</div><div className="mt-1 text-slate-500">Last event: {call.lastTelnyxEvent || "Waiting"}{call.sipHangupCause ? ` · SIP cause ${call.sipHangupCause}` : ""}</div><button type="button" onClick={() => void navigator.clipboard?.writeText(call.callSessionId || "")} className="mt-2 font-semibold text-brand hover:underline">Copy session ID</button></div>}</section>
     </div>
   </div>;
 }
