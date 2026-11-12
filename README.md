@@ -23,6 +23,12 @@ Ancentrix Dial is a calling workspace for teams. The browser starts a phone brid
 
 5. Register an organization, verify the owner email, then configure Telnyx from Settings. Each employee saves their own phone number in Profile; the owner configures the shared Telnyx values.
 
+## Login and routing
+
+The login, registration, password recovery, and email-verification pages are public. The login form does not redirect based on a background session check; it creates the HttpOnly session cookie only after the user submits valid Firebase credentials. The dashboard validates that cookie on the server, and protected API routes validate it through `requireUser`. Middleware is limited to API rate limiting and same-origin checks so an expired cookie cannot cause a client-side page redirect loop.
+
+For deployment, make sure the `NEXT_PUBLIC_FIREBASE_*` values belong to the same Firebase project as `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, and `FIREBASE_PRIVATE_KEY`. Add the deployed hostname to Firebase Authentication's authorized domains, then rebuild/redeploy after changing any `NEXT_PUBLIC_*` value.
+
 ## Firebase setup
 
 Create a Firebase service account and set `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, and `FIREBASE_PRIVATE_KEY`. For a multiline private key in Render, set the environment variable with literal `\n` separators. Deploy `firestore.rules` and `firestore.indexes.json` using the Firebase CLI. All application Firestore operations run through authenticated Next.js server routes using the Admin SDK. The rules intentionally deny direct browser access.

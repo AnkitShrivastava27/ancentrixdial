@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { applyActionCode } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
 
+// This route must remain accessible without an existing workspace session.
 export default function VerifyEmail() {
   const [message, setMessage] = useState("Verifying your email…");
   useEffect(() => {

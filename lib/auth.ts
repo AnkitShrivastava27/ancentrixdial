@@ -2,25 +2,62 @@ import "server-only";
 import { cookies } from "next/headers";
 import { adminAuth } from "@/lib/firebase/admin";
 
-export type SessionUser = { uid: string; email: string; name: string; phone?: string; organizationId: string; role: "owner" | "employee"; disabled?: boolean };
+export type SessionUser = {
+  uid: string;
+  email: string;
+  name: string;
+  phone?: string;
+  organizationId: string;
+  role: "owner" | "employee";
+  disabled?: boolean;
+};
+
 export async function getSessionUser(): Promise<SessionUser | null> {
   if (!adminAuth) return null;
+
   const jar = await cookies();
-  const value = jar.get(process.env.SESSION_COOKIE_NAME || "human-dialer-session")?.value;
+  const cookieName = process.env.SESSION_COOKIE_NAME || "human-dialer-session";
+  const value = jar.get(cookieName)?.value;
   if (!value) return null;
+
   try {
-    // Verify the signed cookie locally. The revocation check requires an extra
-    // Firebase Auth API call on every page request and can fail independently
-    // of a valid session, which otherwise looks like login simply did nothing.
+    // The server session cookie is the single source of truth for page and API
+    // access. Invalid/expired cookies resolve to null and are cleared by the
+    // session endpoint when the browser checks its session.
     const decoded = await adminAuth.verifySessionCookie(value);
     const { db } = await import("@/lib/firebase/admin");
-    const user = await db?.collection("users").doc(decoded.uid).get();
-    if (!user?.exists) return null;
-    const data = user.data()!;
-    if (data.disabled) return null;
-    return { uid: decoded.uid, email: decoded.email || "", name: data.name || decoded.name || "User", phone: data.phone || "", organizationId: data.organizationId, role: data.role, disabled: data.disabled };
+    if (!db) return null;
+
+    const profile = await db.collection("users").doc(decoded.uid).get();
+    if (!profile.exists) return null;
+
+    const data = profile.data();
+    const role = data?.role;
+    const organizationId = data?.organizationId;
+
+    if (
+      data?.disabled ||
+      typeof organizationId !== "string" ||
+      !organizationId ||
+      (role !== "owner" && role !== "employee")
+    ) {
+      return null;
+    }
+
+    return {
+      uid: decoded.uid,
+      email: decoded.email || "",
+      name: data.name || decoded.name || "User",
+      phone: data.phone || "",
+      organizationId,
+      role,
+      disabled: Boolean(data.disabled),
+    };
   } catch (error) {
-    console.error("Firebase session cookie verification failed", error instanceof Error ? error.message : "Unknown error");
+    console.error(
+      "Firebase session cookie verification failed",
+      error instanceof Error ? error.message : "Unknown error",
+    );
     return null;
   }
 }

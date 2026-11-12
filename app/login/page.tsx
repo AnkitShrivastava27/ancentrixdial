@@ -48,6 +48,10 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [setupToken, setSetupToken] = useState("");
   const [workspace, setWorkspace] = useState({ companyName: "", ownerName: "" });
+  // Do not auto-redirect from this page based on a background session check.
+  // A stale/partially valid session can otherwise bounce the user between the
+  // login page and dashboard before they can enter their credentials.
+
   const navigateToDashboard = async () => {
     const check = await fetchWithTimeout(
       "/api/auth/session",
@@ -161,6 +165,7 @@ export default function LoginPage() {
               <input
                 required
                 type="email"
+                autoComplete="username"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="mt-2 h-11 w-full rounded-lg border border-slate-200 px-3 outline-none focus:border-brand"
@@ -172,6 +177,7 @@ export default function LoginPage() {
               <input
                 required
                 type="password"
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="mt-2 h-11 w-full rounded-lg border border-slate-200 px-3 outline-none focus:border-brand"
