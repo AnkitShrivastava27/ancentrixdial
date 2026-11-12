@@ -124,7 +124,7 @@ export function Dialer({ visible = true, user, initialTarget }: { visible?: bool
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Call could not be started.");
-      setCall({ id: data.id, status: data.status, connectedAt: null, customerDialedAt: null, customerAnsweredAt: null, bridgeRequestedAt: null, endedAt: false, duration: 0 });
+      setCall({ id: data.id, status: data.status, connectedAt: null, customerDialedAt: null, customerAnsweredAt: null, endedAt: false, duration: 0 });
       setStatus("Calling your phone… answer it and Telnyx will call the contact.");
     } catch (error) { setStatus(error instanceof Error ? error.message : "Call could not be started."); }
     finally { setBusy(false); }
