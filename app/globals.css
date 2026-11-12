@@ -8,3 +8,25 @@ body { margin: 0; background: #f7f8fc; color: #101828; font-family: Arial, Helve
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 .dark body { background: #111827; color: #f8fafc; }
+
+/* Keep the sidebar navigation usable on short screens and long menus. */
+.side-nav-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+.side-nav-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.side-nav-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.side-nav-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+.dark .side-nav-scroll {
+  scrollbar-color: #475569 transparent;
+}
+.dark .side-nav-scroll::-webkit-scrollbar-thumb {
+  background: #475569;
+}

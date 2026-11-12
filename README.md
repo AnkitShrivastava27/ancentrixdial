@@ -29,6 +29,10 @@ The login, registration, password recovery, and email-verification pages are pub
 
 For deployment, make sure the `NEXT_PUBLIC_FIREBASE_*` values belong to the same Firebase project as `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, and `FIREBASE_PRIVATE_KEY`. Add the deployed hostname to Firebase Authentication's authorized domains, then rebuild/redeploy after changing any `NEXT_PUBLIC_*` value.
 
+## Dashboard call activity data
+
+The dashboard's Call activity chart is generated from the authenticated `/api/call-logs` endpoint, which reads tenant-scoped records from the Firestore `call_logs` collection. Outbound calls create a log when the Telnyx call is started; inbound calls create a log when the Telnyx webhook receives the call. Subsequent Telnyx webhook events update the stored status, connection time, end time, and duration. The chart groups these saved records by their `createdAt` date for the selected range (last 7 days or current month). It shows an empty state when there are no call records; it does not use sample values.
+
 ## Firebase setup
 
 Create a Firebase service account and set `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, and `FIREBASE_PRIVATE_KEY`. For a multiline private key in Render, set the environment variable with literal `\n` separators. Deploy `firestore.rules` and `firestore.indexes.json` using the Firebase CLI. All application Firestore operations run through authenticated Next.js server routes using the Admin SDK. The rules intentionally deny direct browser access.
@@ -72,6 +76,6 @@ pnpm build
 
 ## Current scope
 
-Implemented: organization registration, verified owner email login, Firebase password recovery, owner-created employee Firebase accounts with admin-assigned initial passwords, owner and employee roles, encrypted Telnyx Voice API settings, phone-bridge outbound calling and inbound forwarding to the workspace owner, tenant-scoped contacts with search/favorites/CSV import-export, call log storage/search/notes/export, dashboard summaries/charts, responsive workspace layout, owner employee create/remove/disable/reset flows, profile and organization settings, and role-guarded Telnyx settings.
+Implemented: organization registration, verified owner email login, Firebase password recovery, owner-created employee Firebase accounts with admin-assigned initial passwords, owner and employee roles, encrypted Telnyx Voice API settings, phone-bridge outbound calling and inbound forwarding to the workspace owner, tenant-scoped contacts with search/favorites/CSV import-export, call log storage/search/notes/export, dashboard summaries and live call-log aggregations, responsive workspace layout with a scrollable sidebar, owner employee create/remove/disable/reset flows, profile and organization settings, and role-guarded Telnyx settings.
 
-Current limits: contacts do not yet have an edit form; call logs support text search but not direction/status filters; the dashboard chart currently shows a sample weekly series rather than aggregating a monthly range; activity records are written for selected actions but have no viewer page; and the UI uses Tailwind components rather than generated shadcn/ui primitives. Real Telnyx credentials and webhook configuration are required for end-to-end calls. The supplied legacy backend's inbound AI media streaming is not part of this app; inbound calls here forward to the owner's phone.
+Current limits: contacts do not yet have an edit form; call logs support text search but not direction/status filters; activity records are written for selected actions but have no viewer page; and the UI uses Tailwind components rather than generated shadcn/ui primitives. Real Telnyx credentials and webhook configuration are required for end-to-end calls. The supplied legacy backend's inbound AI media streaming is not part of this app; inbound calls here forward to the owner's phone.
