@@ -156,7 +156,9 @@ export async function POST(request: NextRequest) {
     const eventType = detail.event_type;
 
     // Outbound phone bridge: after the employee answers, dial the selected CRM contact.
-    // bridge_intent + bridge_on_answer link both call legs and bridge them when the contact answers.
+    // We link the two legs here, then explicitly issue Telnyx's Bridge command when the
+    // customer answers. This avoids treating an answered call as an audible connection
+    // before the media bridge has actually been established.
     if (eventType === "call.answered" && leg === "agent" && log.direction === "outbound") {
       const latest = (await logRef.get()).data() || {};
       if (!latest.customerCallControlId) {
@@ -169,7 +171,6 @@ export async function POST(request: NextRequest) {
             from: config.outboundNumber,
             link_to: payload.call_control_id,
             bridge_intent: true,
-            bridge_on_answer: true,
             webhook_url: webhookFor(request, callLogId, "customer"),
             webhook_url_method: "POST",
             timeout_secs: 30,
@@ -199,9 +200,81 @@ export async function POST(request: NextRequest) {
           });
         }
       }
+    } else if (eventType === "call.answered" && leg === "customer" && log.direction === "outbound") {
+      // The employee and contact are now both on answered call legs. Explicitly
+      // bridge them; call.answered alone does not mean the two parties can hear
+      // each other. Telnyx emits call.bridged for both legs after media is joined.
+      const latest = (await logRef.get()).data() || {};
+      const agentCallControlId = latest.callControlId;
+      const customerCallControlId = payload.call_control_id;
+
+      if (typeof agentCallControlId !== "string" || !agentCallControlId) {
+        const message = "The employee call leg is missing; the two callers could not be bridged.";
+        await logRef.update({ status: "failed", errorMessage: message, bridgeErrorMessage: message, endedAt: new Date() });
+        await action(apiKey, customerCallControlId, "hangup", {}).catch(() => {});
+      } else if (!latest.bridgeCommandAcceptedAt && !latest.connectedAt) {
+        // Claim the bridge command so duplicate webhook deliveries cannot race
+        // and issue multiple bridge requests for the same call.
+        const shouldBridge = await db.runTransaction(async (tx) => {
+          const currentSnap = await tx.get(logRef!);
+          const current = currentSnap.data() || {};
+          const pendingAt = timestampMillis(current.bridgeCommandPendingAt);
+          const pendingIsFresh = Boolean(current.bridgeCommandPending && pendingAt && Date.now() - pendingAt < 45_000);
+          if (current.bridgeCommandAcceptedAt || current.connectedAt || pendingIsFresh) return false;
+          tx.update(logRef!, {
+            status: "bridging",
+            customerAnsweredAt: current.customerAnsweredAt || new Date(),
+            bridgeCommandPending: true,
+            bridgeCommandPendingAt: new Date(),
+          });
+          return true;
+        });
+
+        if (shouldBridge) {
+          let bridgeResponse: Response | null = null;
+          let bridgeResult: any = {};
+          try {
+            bridgeResponse = await action(apiKey, agentCallControlId, "bridge", {
+              call_control_id: customerCallControlId,
+              command_id: detail.id,
+              prevent_double_bridge: true,
+            });
+            bridgeResult = await bridgeResponse.json().catch(() => ({}));
+          } catch (error) {
+            bridgeResult = { error: error instanceof Error ? error.message : "Network error while contacting Telnyx." };
+          }
+
+          if (!bridgeResponse?.ok) {
+            const message = String(
+              bridgeResult?.errors?.[0]?.detail || bridgeResult?.error ||
+              `Telnyx rejected the media bridge (HTTP ${bridgeResponse?.status || "network error"}).`,
+            ).slice(0, 500);
+            await logRef.update({
+              status: "failed",
+              errorMessage: message,
+              bridgeErrorMessage: message,
+              bridgeCommandPending: false,
+              bridgeFailedAt: new Date(),
+              endedAt: new Date(),
+            });
+            await Promise.all([agentCallControlId, customerCallControlId].map((id) =>
+              action(apiKey, id, "hangup", {}).catch(() => undefined),
+            ));
+          } else {
+            await logRef.update({
+              bridgeCommandPending: false,
+              bridgeCommandAcceptedAt: new Date(),
+              bridgeErrorMessage: null,
+              status: "bridging",
+            });
+          }
+        }
+      }
     } else if (eventType === "call.bridged" && log.direction === "outbound" && (leg === "agent" || leg === "customer")) {
       const latest = (await logRef.get()).data() || {};
-      await logRef.update({ status: "connected", connectedAt: latest.connectedAt || new Date() });
+      if (!latest.endedAt && latest.status !== "failed") {
+        await logRef.update({ status: "connected", connectedAt: latest.connectedAt || new Date(), bridgeCommandPending: false });
+      }
     } else if (eventType === "call.answered" && leg === "inbound" && log.direction === "inbound") {
       const response = await action(apiKey, payload.call_control_id, "transfer", {
         to: log.ownerPhone,

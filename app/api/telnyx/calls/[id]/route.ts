@@ -13,7 +13,21 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   const toMillis = (value: any) => value?.toDate ? value.toDate().getTime() : value ? new Date(value).getTime() : null;
   const connectedAt = toMillis(call.connectedAt);
   const customerDialedAt = toMillis(call.customerDialedAt);
-  return NextResponse.json({ id, status: call.status, connectedAt, customerDialedAt, endedAt: !!call.endedAt, endedByLeg: call.endedByLeg || null, errorMessage: call.errorMessage || null, duration: call.duration || 0 });
+  const customerAnsweredAt = toMillis(call.customerAnsweredAt);
+  const bridgeRequestedAt = toMillis(call.bridgeCommandPendingAt || call.bridgeCommandAcceptedAt);
+  return NextResponse.json({
+    id,
+    status: call.status,
+    connectedAt,
+    customerDialedAt,
+    customerAnsweredAt,
+    bridgeRequestedAt,
+    bridgeErrorMessage: call.bridgeErrorMessage || null,
+    endedAt: !!call.endedAt,
+    endedByLeg: call.endedByLeg || null,
+    errorMessage: call.errorMessage || null,
+    duration: call.duration || 0,
+  });
 }
 
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {

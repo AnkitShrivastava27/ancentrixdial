@@ -89,7 +89,7 @@ export function SettingsView({ user }: { user: SessionUser }) {
       let data: { ok?: boolean; error?: string } = {};
       try { data = responseText ? JSON.parse(responseText) as { ok?: boolean; error?: string } : {}; } catch { /* handled below */ }
       if (r.ok && data.ok) {
-        setNotice("Telnyx settings saved. Calls will ring the employee phone, then dial and bridge the selected contact.");
+        setNotice("Telnyx settings saved. Calls ring the employee phone first, then dial the selected contact and explicitly bridge both legs when the contact answers.");
       } else {
         setNotice(data.error || `The server returned an empty or invalid response while saving Telnyx settings (HTTP ${r.status}). Check the server logs.`);
       }

@@ -4,7 +4,19 @@ import { useEffect, useRef, useState } from "react";
 import { Phone, PhoneOff, Delete, PhoneForwarded } from "lucide-react";
 import type { SessionUser } from "@/lib/auth";
 
-type ActiveCall = { id: string; status: string; connectedAt: number | null; customerDialedAt: number | null; endedAt: boolean; endedByLeg?: string | null; errorMessage?: string | null; duration: number };
+type ActiveCall = {
+  id: string;
+  status: string;
+  connectedAt: number | null;
+  customerDialedAt: number | null;
+  customerAnsweredAt?: number | null;
+  bridgeRequestedAt?: number | null;
+  bridgeErrorMessage?: string | null;
+  endedAt: boolean;
+  endedByLeg?: string | null;
+  errorMessage?: string | null;
+  duration: number;
+};
 type DialTarget = { number: string; contactName: string };
 
 export function Dialer({ visible = true, user, initialTarget }: { visible?: boolean; user: SessionUser; initialTarget?: DialTarget | null }) {
@@ -40,7 +52,17 @@ export function Dialer({ visible = true, user, initialTarget }: { visible?: bool
             setStatus(next.status === "connected" ? "Call ended" : next.status === "missed" ? (next.endedByLeg === "agent" ? "Your phone was not answered" : "The contact did not answer") : next.status === "rejected" ? "Call ended" : next.errorMessage || "Call failed");
           } else {
             setCall(next);
-            setStatus(next.connectedAt ? "Connected — speak on your phone" : next.customerDialedAt ? "Your phone answered — calling the contact…" : "Calling your phone… answer it to call the contact.");
+            setStatus(
+              next.connectedAt
+                ? "Connected — speak on your phone"
+                : next.bridgeErrorMessage
+                  ? `Audio bridge failed: ${next.bridgeErrorMessage}`
+                  : next.bridgeRequestedAt || next.customerAnsweredAt
+                    ? "Contact answered — connecting audio…"
+                    : next.customerDialedAt
+                      ? "Your phone answered — calling the contact…"
+                      : "Calling your phone… answer it to call the contact.",
+            );
             if (next.connectedAt) setSeconds(Math.max(0, Math.floor((Date.now() - next.connectedAt) / 1000)));
           }
         }
@@ -64,7 +86,7 @@ export function Dialer({ visible = true, user, initialTarget }: { visible?: bool
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Call could not be started.");
-      setCall({ id: data.id, status: data.status, connectedAt: null, customerDialedAt: null, endedAt: false, duration: 0 });
+      setCall({ id: data.id, status: data.status, connectedAt: null, customerDialedAt: null, customerAnsweredAt: null, bridgeRequestedAt: null, endedAt: false, duration: 0 });
       setStatus("Calling your phone… answer it and Telnyx will call the contact.");
     } catch (error) { setStatus(error instanceof Error ? error.message : "Call could not be started."); }
     finally { setBusy(false); }
@@ -90,7 +112,7 @@ export function Dialer({ visible = true, user, initialTarget }: { visible?: bool
           <div className="mt-5 flex justify-center">{call ? <button onClick={() => void hangup()} className="flex h-12 items-center gap-2 rounded-xl bg-red-500 px-6 font-semibold text-white"><PhoneOff size={18}/> End call</button> : <button disabled={busy || !user.phone} onClick={() => void place()} className="flex h-12 items-center gap-2 rounded-xl bg-emerald-500 px-8 font-semibold text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"><Phone size={18}/> {busy ? "Starting…" : "Call"}</button>}</div>
         </div>
       </section>
-      <section className="rounded-2xl bg-[#f1f0ff] p-5 dark:bg-indigo-950/50"><div className="font-semibold">How calls work</div><ol className="mt-2 list-inside list-decimal space-y-2 text-sm leading-6 text-slate-600 dark:text-slate-300"><li>Enter the customer’s phone number.</li><li>Telnyx first calls your saved profile phone number.</li><li>After you answer, Telnyx places a second call to the customer and bridges both calls when they answer.</li></ol><p className="mt-4 text-xs text-slate-500">Inbound calls to your Telnyx number ring the workspace owner’s phone.</p></section>
+      <section className="rounded-2xl bg-[#f1f0ff] p-5 dark:bg-indigo-950/50"><div className="font-semibold">How calls work</div><ol className="mt-2 list-inside list-decimal space-y-2 text-sm leading-6 text-slate-600 dark:text-slate-300"><li>Enter the customer’s phone number.</li><li>Telnyx first calls your saved profile phone number.</li><li>After you answer, Telnyx calls the customer.</li><li>When the customer answers, the server explicitly bridges both call legs. The timer starts only after Telnyx confirms the bridge.</li></ol><p className="mt-4 text-xs text-slate-500">Inbound calls to your Telnyx number ring the workspace owner’s phone.</p></section>
     </div>
   </div>;
 }
