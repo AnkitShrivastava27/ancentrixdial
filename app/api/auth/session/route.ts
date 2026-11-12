@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminInitializationFailed, db } from "@/lib/firebase/admin";
+import { getSessionUser } from "@/lib/auth";
+
+export async function GET() {
+  const user = await getSessionUser();
+  if (!user) return NextResponse.json({ error: "No valid sign-in session was found." }, { status: 401 });
+  return NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
+}
 
 export async function POST(request: NextRequest) {
   if (!adminAuth)

@@ -19,6 +19,14 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [setupToken, setSetupToken] = useState("");
   const [workspace, setWorkspace] = useState({ companyName: "", ownerName: "" });
+  const navigateToDashboard = async () => {
+    const check = await fetch("/api/auth/session", { method: "GET", cache: "no-store", credentials: "same-origin" });
+    const data = await check.json().catch(() => ({}));
+    if (!check.ok) {
+      throw new Error(data.error || "Sign-in succeeded, but the browser did not retain the session cookie. Check the site URL and cookie settings, then try again.");
+    }
+    window.location.assign("/");
+  };
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -58,7 +66,7 @@ export default function LoginPage() {
         return;
       }
       if (!response.ok) throw new Error(data.error || "Could not create a session");
-      location.href = "/";
+      await navigateToDashboard();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Sign in failed");
       setBusy(false);
@@ -83,7 +91,7 @@ export default function LoginPage() {
       });
       const sessionData = await sessionResponse.json();
       if (!sessionResponse.ok) throw new Error(sessionData.error || "Workspace created, but sign-in did not finish");
-      location.href = "/";
+      await navigateToDashboard();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not finish workspace setup");
       setBusy(false);
