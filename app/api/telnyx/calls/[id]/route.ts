@@ -46,6 +46,8 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     agentBridgedAt: toMillis(call.agentBridgedAt),
     customerBridgedAt: toMillis(call.customerBridgedAt),
     bridgeMode: call.bridgeMode || null,
+    bridgeHttpStatus: call.bridgeHttpStatus || null,
+    bridgeError: call.bridgeError || null,
     callSessionId: call.telnyxCallSessionId || call.agentCallSessionId || call.customerCallSessionId || null,
     agentCallSessionId: call.agentCallSessionId || null,
     customerCallSessionId: call.customerCallSessionId || null,

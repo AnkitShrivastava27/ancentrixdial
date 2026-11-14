@@ -302,9 +302,6 @@ export async function POST(request: NextRequest) {
           to: target,
           from: callerId,
           link_to: linkedAgentCallId,
-          bridge_intent: true,
-          bridge_on_answer: true,
-          prevent_double_bridge: true,
           command_id: commandId,
           client_state: encodeClientState(callLogId, "customer"),
           webhook_url: webhookFor(request, callLogId, "customer"),
@@ -319,8 +316,7 @@ export async function POST(request: NextRequest) {
           customerDialRequestSummary: {
             connectionId: String(config.voiceAppId || ""),
             linkToAgentCallControlId: linkedAgentCallId,
-            bridgeIntent: true,
-            bridgeOnAnswer: true,
+            bridgeMode: "explicit_bridge",
           },
         });
         console.info("Starting Telnyx customer leg", {
@@ -439,20 +435,49 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // The customer has answered; bridge_on_answer handles the media bridge.
-    // Never overwrite an end request if the agent or app has already hung up.
+    // The customer has answered: bridge the two legs explicitly. Unlike the
+    // automatic bridge_on_answer flag, a failed bridge command is reported by
+    // Telnyx here, so it can be logged and shown instead of leaving two phones
+    // "connected" with no media path between them.
     if (eventType === "call.answered" && leg === "customer" && log.direction === "outbound") {
-      await db.runTransaction(async (tx) => {
+      const bridgeable = await db.runTransaction(async (tx) => {
         const latestSnap = await tx.get(logRef!);
         const latest = latestSnap.data() || {};
-        if (latest.endedAt || ["ending", "ended", "failed", "missed"].includes(latest.status)) return;
+        if (latest.endedAt || ["ending", "ended", "failed", "missed"].includes(latest.status)) return null;
+        if (latest.bridgeRequestedAt) return null; // retry of the same answer event
         tx.update(logRef!, {
           customerAnsweredAt: new Date(),
           customerDialStatus: "answered",
           status: "bridging",
-          bridgeMode: "bridge_on_answer",
+          bridgeMode: "explicit_bridge",
+          bridgeRequestedAt: new Date(),
         });
+        return { agentId: (latest.callControlId as string | undefined) || "" };
       });
+
+      if (bridgeable) {
+        if (!bridgeable.agentId) throw new Error("Agent call-control ID is missing; cannot bridge the call.");
+        const bridge = await telnyxAction(apiKey, bridgeable.agentId, "bridge", {
+          call_control_id: callControlId, // the customer leg
+          command_id: `${callLogId}-bridge`,
+        });
+        const bridgeDetail = String(bridge.result?.errors?.[0]?.detail || "").slice(0, 500);
+        console.info("Telnyx bridge response", {
+          callLogId,
+          httpStatus: bridge.response.status,
+          ok: bridge.response.ok,
+          detail: bridgeDetail || null,
+        });
+        await logRef.update({ bridgeHttpStatus: bridge.response.status, bridgeError: bridge.response.ok ? null : bridgeDetail || `HTTP ${bridge.response.status}` });
+        if (!bridge.response.ok) {
+          const message = bridgeDetail || `Telnyx rejected the bridge command (HTTP ${bridge.response.status}).`;
+          await logRef.update({ status: "failed", errorMessage: message, endedAt: new Date() });
+          await Promise.all([
+            hangupPeer(apiKey, callControlId, `${detail.id}-bridge-failed-customer`),
+            hangupPeer(apiKey, bridgeable.agentId, `${detail.id}-bridge-failed-agent`),
+          ]);
+        }
+      }
     }
 
     // Telnyx sends call.bridged for both legs. Mark connected only after both
@@ -469,7 +494,7 @@ export async function POST(request: NextRequest) {
         tx.update(logRef!, {
           ...(leg === "agent" ? { agentBridgedAt: now } : { customerBridgedAt: now }),
           status: bothBridged ? "connected" : "bridging",
-          ...(bothBridged ? { connectedAt: latest.connectedAt || now, customerDialStatus: "connected", bridgeMode: "bridge_on_answer" } : {}),
+          ...(bothBridged ? { connectedAt: latest.connectedAt || now, customerDialStatus: "connected", bridgeMode: "explicit_bridge" } : {}),
         });
       });
     }

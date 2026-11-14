@@ -23,6 +23,8 @@ type ActiveCall = {
   agentCallControlId?: string | null;
   customerCallControlId?: string | null;
   bridgeMode?: string | null;
+  bridgeHttpStatus?: number | null;
+  bridgeError?: string | null;
   hangupError?: string | null;
   lastWebhookLeg?: string | null;
   lastWebhookCallControlId?: string | null;
@@ -160,7 +162,7 @@ export function Dialer({ visible = true, user, initialTarget }: { visible?: bool
           <div className="mt-5 flex justify-center">{call ? <button onClick={() => void hangup()} className="flex h-12 items-center gap-2 rounded-xl bg-red-500 px-6 font-semibold text-white"><PhoneOff size={18}/> End call</button> : <button disabled={busy || !user.phone} onClick={() => void place()} className="flex h-12 items-center gap-2 rounded-xl bg-emerald-500 px-8 font-semibold text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"><Phone size={18}/> {busy ? "Starting…" : "Call"}</button>}</div>
         </div>
       </section>
-      <section className="rounded-2xl bg-[#f1f0ff] p-5 dark:bg-indigo-950/50"><div className="font-semibold">How calls work</div><ol className="mt-2 list-inside list-decimal space-y-2 text-sm leading-6 text-slate-600 dark:text-slate-300"><li>Enter the customer’s phone number.</li><li>Telnyx first calls your saved profile phone number.</li><li>After you answer, Telnyx calls the customer.</li><li>When the customer answers, Telnyx automatically bridges both call legs. The timer starts after Telnyx confirms the bridge.</li></ol><p className="mt-4 text-xs text-slate-500">Inbound calls to your Telnyx number ring the workspace owner’s phone.</p>{call && <div className="mt-4 rounded-xl border border-indigo-200 bg-white/70 p-3 text-xs dark:border-indigo-900 dark:bg-slate-900/60">
+      <section className="rounded-2xl bg-[#f1f0ff] p-5 dark:bg-indigo-950/50"><div className="font-semibold">How calls work</div><ol className="mt-2 list-inside list-decimal space-y-2 text-sm leading-6 text-slate-600 dark:text-slate-300"><li>Enter the customer’s phone number.</li><li>Telnyx first calls your saved profile phone number.</li><li>After you answer, Telnyx calls the customer.</li><li>When the customer answers, the app sends Telnyx a bridge command to join both call legs. The timer starts after Telnyx confirms the bridge.</li></ol><p className="mt-4 text-xs text-slate-500">Inbound calls to your Telnyx number ring the workspace owner’s phone.</p>{call && <div className="mt-4 rounded-xl border border-indigo-200 bg-white/70 p-3 text-xs dark:border-indigo-900 dark:bg-slate-900/60">
         <div className="font-semibold">Call diagnostics</div>
         <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-slate-600 dark:text-slate-300">
           <span>Customer destination</span><span className="break-all text-right font-mono">{call.customerDialTarget || call.number || number || "—"}</span>
@@ -177,6 +179,7 @@ export function Dialer({ visible = true, user, initialTarget }: { visible?: bool
         </div>
         {call.customerDialError && <p className="mt-2 break-words text-red-600">Customer dial error: {call.customerDialError}</p>}
         {call.webhookError && <p className="mt-2 break-words text-red-600">Webhook error ({call.webhookErrorEventType || "event"}/{call.webhookErrorLeg || "unknown leg"}): {call.webhookError}</p>}
+        {call.bridgeError && <p className="mt-2 break-words text-red-600">Bridge error{call.bridgeHttpStatus ? ` (HTTP ${call.bridgeHttpStatus})` : ""}: {call.bridgeError}</p>}
         {call.hangupError && <p className="mt-2 break-words text-red-600">Hangup error: {call.hangupError}</p>}
         {call.callSessionId && <button type="button" onClick={() => void navigator.clipboard?.writeText(call.callSessionId || "")} className="mt-2 font-semibold text-brand hover:underline">Copy session ID</button>}
       </div>}</section>
